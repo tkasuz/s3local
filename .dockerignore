@@ -1,0 +1,40 @@
+# Binaries
+bin/
+*.exe
+*.dll
+*.so
+*.dylib
+s3local
+
+# Test and coverage files
+*.test
+*.out
+coverage.txt
+
+# Database files
+*.db
+*.db-shm
+*.db-wal
+
+# Development files
+.git/
+.gitignore
+.vscode/
+.idea/
+
+# Documentation
+README.md
+*.md
+docs/
+
+# CI/CD
+.github/
+
+# Examples and tests
+examples/
+*_test.go
+
+# Temporary files
+tmp/
+temp/
+.DS_Store

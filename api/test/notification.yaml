@@ -1,0 +1,17 @@
+notifications:
+  - bucket: photos
+    destination:
+      type: sqs
+      url: http://localhost:9324/queue/image-events
+    events:
+      - s3:ObjectCreated:Put
+    prefix: "user/"
+    suffix: ".jpg"
+
+  - bucket: photos
+    destination:
+      type: lambda
+      arn: arn:aws:lambda:local:000000000000:function:resizeImage
+    events:
+      - s3:ObjectCreated:*
+    prefix: "user/"

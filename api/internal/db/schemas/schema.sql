@@ -59,3 +59,40 @@ CREATE TABLE IF NOT EXISTS object_tags (
 );
 
 CREATE INDEX IF NOT EXISTS idx_object_tags_object_id ON object_tags(object_id);
+
+-- S3 notifications table
+CREATE TABLE IF NOT EXISTS notifications (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    bucket_name TEXT NOT NULL,
+    event_type TEXT NOT NULL, -- e.g., 's3:ObjectCreated:Put', 's3:ObjectRemoved:Delete'
+    destination_type TEXT NOT NULL, -- 'sns', 'sqs', 'lambda'
+    destination_arn TEXT NOT NULL,
+    filter_prefix TEXT,
+    filter_suffix TEXT,
+    enabled BOOLEAN NOT NULL DEFAULT 1,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (bucket_name) REFERENCES buckets(name) ON DELETE CASCADE
+);
+
+-- Indexes for notifications table
+CREATE INDEX IF NOT EXISTS idx_notifications_bucket_name ON notifications(bucket_name);
+CREATE INDEX IF NOT EXISTS idx_notifications_event_type ON notifications(event_type);
+CREATE INDEX IF NOT EXISTS idx_notifications_enabled ON notifications(enabled);
+
+-- Notification events log table (for tracking sent notifications)
+CREATE TABLE IF NOT EXISTS events (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    bucket_name TEXT NOT NULL,
+    object_id INTEGER NOT NULL,
+    event_type TEXT NOT NULL,
+    event_time DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (bucket_name) REFERENCES buckets(name) ON DELETE CASCADE,
+    FOREIGN KEY (object_id) REFERENCES objects(id) ON DELETE CASCADE
+);
+
+-- Indexes for notification events table
+CREATE INDEX IF NOT EXISTS idx_events_bucket_name ON events(bucket_name);
+CREATE INDEX IF NOT EXISTS idx_events_object_id ON events(object_id);
+CREATE INDEX IF NOT EXISTS idx_events_status ON events(status);
+CREATE INDEX IF NOT EXISTS idx_events_event_time ON events(event_time);

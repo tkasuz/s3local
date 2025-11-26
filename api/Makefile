@@ -75,7 +75,7 @@ dev:
 ## sqlc: Generate Go code from SQL using sqlc
 sqlc:
 	@echo "Generating code from SQL..."
-	@sqlc generate
+	@go tool sqlc generate
 	@echo "SQL code generation complete"
 
 ## mocks: Generate mocks for testing using mockery

@@ -85,18 +85,18 @@ func PutObject(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	objectID, err := store.Queries.GetObjectID(r.Context(), db.GetObjectIDParams{
+		BucketName: bucket,
+		Key:        key,
+	})
+	if err != nil {
+		s3error.NewInternalError(err).WriteError(w)
+		return
+	}
+
 	// Handle metadata
 	metadata := extractMetadata(r.Header)
 	if len(metadata) > 0 {
-		objectID, err := store.Queries.GetObjectID(r.Context(), db.GetObjectIDParams{
-			BucketName: bucket,
-			Key:        key,
-		})
-		if err != nil {
-			s3error.NewInternalError(err).WriteError(w)
-			return
-		}
-
 		// Delete existing metadata and insert new
 		_ = store.Queries.DeleteObjectMetadata(r.Context(), objectID)
 		for k, v := range metadata {
@@ -107,6 +107,11 @@ func PutObject(w http.ResponseWriter, r *http.Request) {
 			})
 		}
 	}
+
+	store.Queries.CreateEvent(r.Context(), db.CreateEventParams{
+		BucketName: bucket,
+		ObjectID:   objectID,
+	})
 
 	w.Header().Set("ETag", fmt.Sprintf(`"%s"`, etag))
 	w.WriteHeader(http.StatusOK)

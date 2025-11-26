@@ -14,6 +14,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/go-chi/cors"
+	_ "github.com/mattn/go-sqlite3"
 	"golang.org/x/net/http2"
 	"golang.org/x/net/http2/h2c"
 
@@ -33,7 +34,7 @@ const (
 
 func registerRoutes(r chi.Router) {
 	r.Get("/", bucket.ListBuckets)
-	r.Route("/", func(r chi.Router) {
+	r.Route("/{bucket}", func(r chi.Router) {
 		r.Put("/", bucket.CreateBucket)
 		r.Delete("/", bucket.DeleteBucket)
 		r.Head("/", bucket.HeadBucket)

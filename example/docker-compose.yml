@@ -3,7 +3,7 @@ version: '3.8'
 services:
   s3local:
     build:
-      context: .
+      context: ../api
       dockerfile: Dockerfile
     container_name: s3local
     ports:

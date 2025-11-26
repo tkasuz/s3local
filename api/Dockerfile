@@ -23,8 +23,9 @@ RUN CGO_ENABLED=1 GOOS=linux go build -a -installsuffix cgo -ldflags '-extldflag
 # Runtime stage
 FROM alpine:latest
 
-# Install runtime dependencies
-RUN apk --no-cache add ca-certificates sqlite-libs
+# Install runtime dependencies including Atlas CLI
+RUN apk --no-cache add ca-certificates sqlite-libs curl && \
+    curl -sSf https://atlasgo.sh | sh
 
 # Create non-root user
 RUN addgroup -g 1000 s3local && \

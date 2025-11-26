@@ -107,3 +107,23 @@ func ListObjectsV2(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 	xml.NewEncoder(w).Encode(result)
 }
+
+// ListObjectsV2Request represents the S3 ListObjectsV2 request
+type ListObjectsV2Request struct {
+	// Path parameters
+	Bucket string
+
+	// Query parameters
+	QueryParams ListObjectsV2QueryParams
+}
+
+// ListObjectsV2QueryParams represents query parameters for ListObjectsV2
+type ListObjectsV2QueryParams struct {
+	Delimiter         string // delimiter
+	EncodingType      string // encoding-type
+	MaxKeys           int64  // max-keys
+	Prefix            string // prefix
+	ContinuationToken string // continuation-token
+	FetchOwner        bool   // fetch-owner
+	StartAfter        string // start-after
+}

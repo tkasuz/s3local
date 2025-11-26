@@ -112,6 +112,48 @@ func PutObject(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 }
 
+// PutObjectRequest represents the S3 PutObject request
+type PutObjectRequest struct {
+	// Path parameters
+	Bucket string
+	Key    string
+
+	// Request headers
+	Headers PutObjectRequestHeaders
+
+	// Request body
+	Body []byte
+}
+
+// PutObjectRequestHeaders represents request headers for PutObject
+type PutObjectRequestHeaders struct {
+	CacheControl              string // Cache-Control
+	ContentDisposition        string // Content-Disposition
+	ContentEncoding           string // Content-Encoding
+	ContentType               string // Content-Type
+	Expires                   string // Expires
+	ACL                       string // x-amz-acl
+	GrantFullControl          string // x-amz-grant-full-control
+	GrantRead                 string // x-amz-grant-read
+	GrantReadACP              string // x-amz-grant-read-acp
+	GrantWriteACP             string // x-amz-grant-write-acp
+	ServerSideEncryption      string // x-amz-server-side-encryption
+	StorageClass              string // x-amz-storage-class
+	WebsiteRedirectLocation   string // x-amz-website-redirect-location
+	SSECustomerAlgorithm      string // x-amz-server-side-encryption-customer-algorithm
+	SSECustomerKey            string // x-amz-server-side-encryption-customer-key
+	SSECustomerKeyMD5         string // x-amz-server-side-encryption-customer-key-MD5
+	SSEKMSKeyId               string // x-amz-server-side-encryption-aws-kms-key-id
+	ObjectLockMode            string // x-amz-object-lock-mode
+	ObjectLockRetainUntilDate string // x-amz-object-lock-retain-until-date
+	ObjectLockLegalHoldStatus string // x-amz-object-lock-legal-hold-status
+}
+
+// PutObjectResponseHeaders represents response headers for PutObject
+type PutObjectResponseHeaders struct {
+	ETag string // ETag
+}
+
 func toNullString(s string) sql.NullString {
 	if s == "" {
 		return sql.NullString{}

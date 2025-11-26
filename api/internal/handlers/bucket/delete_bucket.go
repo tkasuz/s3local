@@ -42,6 +42,7 @@ func DeleteBucket(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	w.Header().Set("Content-Type", "application/xml")
 	w.WriteHeader(http.StatusNoContent)
 }
 

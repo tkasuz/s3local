@@ -2,11 +2,12 @@ package bucket
 
 import (
 	"context"
-	"encoding/xml"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 
+	"github.com/aws/aws-sdk-go-v2/service/s3"
+	"github.com/go-chi/chi/v5"
 	"github.com/stretchr/testify/assert"
 	"github.com/tkasuz/s3local/internal/db"
 	"github.com/tkasuz/s3local/internal/handlers/ctx"
@@ -30,36 +31,40 @@ func TestListBuckets(t *testing.T) {
 	})
 	assert.NoError(t, err)
 
-	req := httptest.NewRequest(http.MethodGet, "/", nil)
-	req = req.WithContext(testCtx)
-	w := httptest.NewRecorder()
+	r := chi.NewRouter()
+	r.Use(ctx.WithStore(store))
+	r.Get("/", func(w http.ResponseWriter, r *http.Request) {
+		ListBuckets(w, r)
+	})
 
-	ListBuckets(w, req)
+	ts := httptest.NewServer(r)
+	defer ts.Close()
 
-	assert.Equal(t, http.StatusOK, w.Code)
-	assert.Equal(t, "application/xml", w.Header().Get("Content-Type"))
+	s3Client := testutil.CreateNewS3Client(ts)
 
-	var result ListAllMyBucketsResult
-	err = xml.Unmarshal(w.Body.Bytes(), &result)
+	// Call ListBuckets via AWS SDK
+	out, err := s3Client.ListBuckets(context.Background(), &s3.ListBucketsInput{})
 	assert.NoError(t, err)
-	assert.Equal(t, 2, len(result.Buckets.Bucket))
-	assert.Equal(t, "test-bucket-1", result.Buckets.Bucket[0].Name)
-	assert.Equal(t, "test-bucket-2", result.Buckets.Bucket[1].Name)
+	assert.Equal(t, 2, len(out.Buckets))
+	assert.Equal(t, "test-bucket-1", *out.Buckets[0].Name)
+	assert.Equal(t, "test-bucket-2", *out.Buckets[1].Name)
 }
 
 func TestListBuckets_Empty(t *testing.T) {
 	testCtx := testutil.SetupTestDB(t)
 
-	req := httptest.NewRequest(http.MethodGet, "/", nil)
-	req = req.WithContext(testCtx)
-	w := httptest.NewRecorder()
+	r := chi.NewRouter()
+	r.Use(ctx.WithStore(ctx.GetStore(testCtx)))
+	r.Get("/", func(w http.ResponseWriter, r *http.Request) {
+		ListBuckets(w, r)
+	})
 
-	ListBuckets(w, req)
+	ts := httptest.NewServer(r)
+	defer ts.Close()
 
-	assert.Equal(t, http.StatusOK, w.Code)
+	s3Client := testutil.CreateNewS3Client(ts)
 
-	var result ListAllMyBucketsResult
-	err := xml.Unmarshal(w.Body.Bytes(), &result)
+	out, err := s3Client.ListBuckets(context.Background(), &s3.ListBucketsInput{})
 	assert.NoError(t, err)
-	assert.Equal(t, 0, len(result.Buckets.Bucket))
+	assert.Equal(t, 0, len(out.Buckets))
 }

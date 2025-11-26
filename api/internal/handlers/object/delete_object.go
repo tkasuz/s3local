@@ -27,3 +27,20 @@ func DeleteObject(w http.ResponseWriter, r *http.Request) {
 	// S3 returns 204 No Content even if the object didn't exist
 	w.WriteHeader(http.StatusNoContent)
 }
+
+// DeleteObjectRequest represents the S3 DeleteObject request
+type DeleteObjectRequest struct {
+	// Path parameters
+	Bucket string
+	Key    string
+
+	// Request headers
+	Headers DeleteObjectRequestHeaders
+}
+
+// DeleteObjectRequestHeaders represents request headers for DeleteObject
+type DeleteObjectRequestHeaders struct {
+	MFA                       string // x-amz-mfa
+	VersionId                 string // versionId (query parameter)
+	BypassGovernanceRetention string // x-amz-bypass-governance-retention
+}

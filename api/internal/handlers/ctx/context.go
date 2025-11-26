@@ -3,6 +3,7 @@ package ctx
 import (
 	"context"
 	"net/http"
+	"strings"
 
 	"github.com/tkasuz/s3local/internal/config"
 	"github.com/tkasuz/s3local/internal/db"
@@ -48,4 +49,30 @@ func GetConfig(ctx context.Context) *config.Config {
 		return cfg
 	}
 	return nil
+}
+
+func WithBucketName() func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			hostname := r.Header.Get("Hostname")
+			bucketName := ""
+			if len(strings.Split(hostname, ".")) > 2 {
+				bucketName = strings.Split(hostname, ".")[0]
+			} else {
+				parts := strings.Split(r.URL.Path, "/")
+				if len(parts) > 1 {
+					bucketName = parts[1]
+				}
+			}
+			ctx := context.WithValue(r.Context(), "bucketName", bucketName)
+			next.ServeHTTP(w, r.WithContext(ctx))
+		})
+	}
+}
+
+func GetBucketName(ctx context.Context) string {
+	if bucketName, ok := ctx.Value("bucketName").(string); ok {
+		return bucketName
+	}
+	return ""
 }

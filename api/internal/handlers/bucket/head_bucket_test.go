@@ -6,6 +6,8 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/go-chi/chi/v5"
 	"github.com/stretchr/testify/assert"
 	"github.com/tkasuz/s3local/internal/db"
@@ -24,34 +26,42 @@ func TestHeadBucket(t *testing.T) {
 	})
 	assert.NoError(t, err)
 
-	req := httptest.NewRequest(http.MethodHead, "/existing-bucket", nil)
-	rctx := chi.NewRouteContext()
-	rctx.URLParams.Add("bucket", "existing-bucket")
-	reqCtx := context.WithValue(testCtx, chi.RouteCtxKey, rctx)
-	req = req.WithContext(reqCtx)
+	r := chi.NewRouter()
+	r.Use(ctx.WithStore(store))
+	r.Head("/{bucket}", func(w http.ResponseWriter, r *http.Request) {
+		HeadBucket(w, r)
+	})
 
-	w := httptest.NewRecorder()
+	ts := httptest.NewServer(r)
+	defer ts.Close()
 
-	HeadBucket(w, req)
+	s3Client := testutil.CreateNewS3Client(ts)
 
-	assert.Equal(t, http.StatusOK, w.Code)
-	assert.Equal(t, "us-west-2", w.Header().Get("x-amz-bucket-region"))
+	// Call HeadBucket via AWS SDK
+	out, err := s3Client.HeadBucket(context.Background(), &s3.HeadBucketInput{
+		Bucket: aws.String("existing-bucket"),
+	})
+	assert.NoError(t, err)
+	assert.Equal(t, "us-west-2", aws.ToString(out.BucketRegion))
 }
 
 func TestHeadBucket_NotFound(t *testing.T) {
 	testCtx := testutil.SetupTestDB(t)
 
-	req := httptest.NewRequest(http.MethodHead, "/nonexistent", nil)
-	rctx := chi.NewRouteContext()
-	rctx.URLParams.Add("bucket", "nonexistent")
-	reqCtx := context.WithValue(testCtx, chi.RouteCtxKey, rctx)
-	req = req.WithContext(reqCtx)
+	r := chi.NewRouter()
+	r.Use(ctx.WithStore(ctx.GetStore(testCtx)))
+	r.Head("/{bucket}", func(w http.ResponseWriter, r *http.Request) {
+		HeadBucket(w, r)
+	})
 
-	w := httptest.NewRecorder()
+	ts := httptest.NewServer(r)
+	defer ts.Close()
 
-	HeadBucket(w, req)
+	s3Client := testutil.CreateNewS3Client(ts)
 
-	assert.Equal(t, http.StatusNotFound, w.Code)
-	// HEAD requests should not have a body
-	assert.Empty(t, w.Body.String())
+	// Call HeadBucket via AWS SDK
+	_, err := s3Client.HeadBucket(context.Background(), &s3.HeadBucketInput{
+		Bucket: aws.String("nonexistent"),
+	})
+	assert.Error(t, err)
 }

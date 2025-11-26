@@ -63,3 +63,37 @@ func GetObject(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 	w.Write(obj.Data)
 }
+
+// GetObjectRequest represents the S3 GetObject request
+type GetObjectRequest struct {
+	// Path parameters
+	Bucket string
+	Key    string
+
+	// Request headers
+	Headers GetObjectRequestHeaders
+}
+
+// GetObjectRequestHeaders represents request headers for GetObject
+type GetObjectRequestHeaders struct {
+	IfMatch              string // If-Match
+	IfModifiedSince      string // If-Modified-Since
+	IfNoneMatch          string // If-None-Match
+	IfUnmodifiedSince    string // If-Unmodified-Since
+	Range                string // Range
+	SSECustomerAlgorithm string // x-amz-server-side-encryption-customer-algorithm
+	SSECustomerKey       string // x-amz-server-side-encryption-customer-key
+	SSECustomerKeyMD5    string // x-amz-server-side-encryption-customer-key-MD5
+}
+
+// GetObjectResponseHeaders represents response headers for GetObject
+type GetObjectResponseHeaders struct {
+	ContentType        string // Content-Type
+	ContentLength      string // Content-Length
+	ETag               string // ETag
+	LastModified       string // Last-Modified
+	AcceptRanges       string // Accept-Ranges
+	ContentEncoding    string // Content-Encoding
+	ContentDisposition string // Content-Disposition
+	CacheControl       string // Cache-Control
+}

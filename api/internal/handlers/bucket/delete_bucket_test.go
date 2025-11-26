@@ -6,6 +6,8 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/go-chi/chi/v5"
 	"github.com/stretchr/testify/assert"
 	"github.com/tkasuz/s3local/internal/db"
@@ -24,17 +26,22 @@ func TestDeleteBucket(t *testing.T) {
 	})
 	assert.NoError(t, err)
 
-	req := httptest.NewRequest(http.MethodDelete, "/test-bucket", nil)
-	rctx := chi.NewRouteContext()
-	rctx.URLParams.Add("bucket", "test-bucket")
-	reqCtx := context.WithValue(testCtx, chi.RouteCtxKey, rctx)
-	req = req.WithContext(reqCtx)
+	r := chi.NewRouter()
+	r.Use(ctx.WithStore(store))
+	r.Delete("/{bucket}", func(w http.ResponseWriter, r *http.Request) {
+		DeleteBucket(w, r)
+	})
 
-	w := httptest.NewRecorder()
+	ts := httptest.NewServer(r)
+	defer ts.Close()
 
-	DeleteBucket(w, req)
+	s3Client := testutil.CreateNewS3Client(ts)
 
-	assert.Equal(t, http.StatusNoContent, w.Code)
+	// Call DeleteBucket via AWS SDK
+	_, err = s3Client.DeleteBucket(context.Background(), &s3.DeleteBucketInput{
+		Bucket: aws.String("test-bucket"),
+	})
+	assert.NoError(t, err)
 
 	// Verify bucket is deleted
 	_, err = store.Queries.GetBucket(context.Background(), "test-bucket")
@@ -44,17 +51,22 @@ func TestDeleteBucket(t *testing.T) {
 func TestDeleteBucket_NotFound(t *testing.T) {
 	testCtx := testutil.SetupTestDB(t)
 
-	req := httptest.NewRequest(http.MethodDelete, "/nonexistent", nil)
-	rctx := chi.NewRouteContext()
-	rctx.URLParams.Add("bucket", "nonexistent")
-	reqCtx := context.WithValue(testCtx, chi.RouteCtxKey, rctx)
-	req = req.WithContext(reqCtx)
+	r := chi.NewRouter()
+	r.Use(ctx.WithStore(ctx.GetStore(testCtx)))
+	r.Delete("/{bucket}", func(w http.ResponseWriter, r *http.Request) {
+		DeleteBucket(w, r)
+	})
 
-	w := httptest.NewRecorder()
+	ts := httptest.NewServer(r)
+	defer ts.Close()
 
-	DeleteBucket(w, req)
+	s3Client := testutil.CreateNewS3Client(ts)
 
-	assert.Equal(t, http.StatusNotFound, w.Code)
+	// Call DeleteBucket via AWS SDK
+	_, err := s3Client.DeleteBucket(context.Background(), &s3.DeleteBucketInput{
+		Bucket: aws.String("nonexistent"),
+	})
+	assert.Error(t, err)
 }
 
 func TestDeleteBucket_NotEmpty(t *testing.T) {

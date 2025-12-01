@@ -16,6 +16,7 @@ import (
 )
 
 func TestDeleteBucket(t *testing.T) {
+	t.Parallel()
 	testCtx := testutil.SetupTestDB(t)
 	store := ctx.GetStore(testCtx)
 

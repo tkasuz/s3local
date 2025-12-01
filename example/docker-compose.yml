@@ -2,18 +2,24 @@ services:
   s3local:
     build:
       context: ../api
-      dockerfile: Dockerfile
+      dockerfile: Dockerfile.dev
     container_name: s3local
     ports:
       - "8080:8080"
     volumes:
+      # Mount source code for hot reloading
+      - ../api:/app
       # Persist database
       - s3local-data:/data
+      # Cache Go modules
+      - go-modules:/go/pkg/mod
     environment:
       - PORT=8080
       - HOST=0.0.0.0
       - DB_PATH=/data/s3local.db
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
 
   elasticmq:
     image: softwaremill/elasticmq-native:latest
@@ -59,9 +65,11 @@ services:
         terraform init
         terraform apply -auto-approve
     depends_on:
-      - s3local
-      - elasticmq
+      s3local:
+        condition: service_healthy
     restart: "no"
 volumes:
   s3local-data:
+    driver: local
+  go-modules:
     driver: local

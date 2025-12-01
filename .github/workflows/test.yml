@@ -1,0 +1,42 @@
+name: Go
+
+on:
+  push:
+    branches: ["main"]
+    paths:
+      - "api/**/*.go"
+      - "api/go.mod"
+      - "api/go.sum"
+  pull_request:
+    branches: ["**"]
+    paths:
+      - "api/**/*.go"
+      - "api/go.mod"
+      - "api/go.sum"
+
+permissions: {}
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-go@v6
+        with:
+          go-version-file: 'api/go.mod'
+          cache-dependency-path: 'api/go.sum'
+
+      - name: Display Go version
+        run: go version
+
+      - name: Install dependencies
+        working-directory: ./api
+        run: go mod download
+
+      - name: Run tests
+        working-directory: ./api
+        run: go test -v ./...

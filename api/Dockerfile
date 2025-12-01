@@ -20,8 +20,8 @@ COPY . .
 # CGO is required for sqlite3
 RUN CGO_ENABLED=1 GOOS=linux go build -a -installsuffix cgo -ldflags '-extldflags "-static"' -o s3local ./cmd/s3local
 
-# Runtime stage
-FROM alpine:latest
+# Runtime stage (production)
+FROM alpine:latest AS production
 
 # Install runtime dependencies including Atlas CLI
 RUN apk --no-cache add ca-certificates sqlite-libs curl && \
@@ -50,10 +50,6 @@ EXPOSE 8080
 ENV PORT=8080
 ENV HOST=0.0.0.0
 ENV DB_PATH=/data/s3local.db
-
-# Health check
-HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-    CMD wget --no-verbose --tries=1 --spider http://localhost:8080/health || exit 1
 
 # Run the application
 CMD ["./s3local"]

@@ -1,8 +1,8 @@
 module github.com/tkasuz/s3local
 
-go 1.24.9
+go 1.25
 
-toolchain go1.24.10
+toolchain go1.25.4
 
 require (
 	ariga.io/atlas-go-sdk v0.7.2

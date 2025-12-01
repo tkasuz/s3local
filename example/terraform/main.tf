@@ -18,3 +18,14 @@ resource "aws_s3_object" "object" {
     Environment = "Dev"
   }
 }
+
+resource "aws_s3_bucket_notification" "bucket_notification" {
+  bucket = aws_s3_bucket.example.id
+
+  lambda_function {
+    lambda_function_arn = "http://lambda:8081/2015-03-31/functions/function/invocations"
+    events              = ["s3:ObjectCreated:*"]
+    filter_prefix       = "AWSLogs/"
+    filter_suffix       = ".log"
+  }
+}

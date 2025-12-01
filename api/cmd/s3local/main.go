@@ -43,6 +43,10 @@ func bucketPutHandler(w http.ResponseWriter, r *http.Request) {
 		bucket.PutBucketPolicy(w, r)
 		return
 	}
+	if r.URL.Query().Has("notification") {
+		bucket.PutBucketNotificationConfiguration(w, r)
+		return
+	}
 	bucket.CreateBucket(w, r)
 }
 
@@ -54,6 +58,10 @@ func bucketGetHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	if r.URL.Query().Has("policy") {
 		bucket.GetBucketPolicy(w, r)
+		return
+	}
+	if r.URL.Query().Has("notification") {
+		bucket.GetBucketNotificationConfiguration(w, r)
 		return
 	}
 	object.ListObjectsV2(w, r)

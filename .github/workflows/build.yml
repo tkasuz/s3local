@@ -1,0 +1,50 @@
+name: Build and Push
+
+on:
+  release:
+    types: [created]
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v5
+        with:
+          persist-credentials: false
+
+      - name: Set up Go
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: 'api/go.mod'
+          cache-dependency-path: 'api/go.sum'
+
+      - name: Install ko
+        uses: ko-build/setup-ko@d006021bd0c28d1ce33a07e7943d48b079944c8d # v0.9
+
+      - name: Extract version from tag
+        id: version
+        run: |
+          # Get the tag name (e.g., v1.0.0)
+          TAG=${GITHUB_REF#refs/tags/}
+          # Remove 'v' prefix if present (v1.0.0 -> 1.0.0)
+          VERSION=${TAG#v}
+          echo "version=${VERSION}" >> $GITHUB_OUTPUT
+          echo "tag=${TAG}" >> $GITHUB_OUTPUT
+
+      - name: Build and push with ko
+        working-directory: ./api
+        run: |
+          ko build ./cmd/s3local \
+            --tags ${STEPS_VERSION_OUTPUTS_VERSION} \
+            --tags ${STEPS_VERSION_OUTPUTS_TAG} \
+            --tags latest \
+            --platform linux/amd64,linux/arm64
+        env:
+          STEPS_VERSION_OUTPUTS_VERSION: ${{ steps.version.outputs.version }}
+          STEPS_VERSION_OUTPUTS_TAG: ${{ steps.version.outputs.tag }}

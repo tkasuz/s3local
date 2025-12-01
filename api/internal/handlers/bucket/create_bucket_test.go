@@ -15,6 +15,7 @@ import (
 )
 
 func TestCreateBucket(t *testing.T) {
+	t.Parallel()
 	testCtx := testutil.SetupTestDB(t)
 	store := ctx.GetStore(testCtx)
 
@@ -32,15 +33,17 @@ func TestCreateBucket(t *testing.T) {
 
 	s3Client := testutil.CreateNewS3Client(ts)
 
-	// Call CreateBucket via AWS SDK
-	_, err := s3Client.CreateBucket(context.Background(), &s3.CreateBucketInput{
-		Bucket: aws.String("new-bucket"),
-	})
-	assert.NoError(t, err)
+	t.Run("Success", func(t *testing.T) {
+		// Call CreateBucket via AWS SDK
+		_, err := s3Client.CreateBucket(context.Background(), &s3.CreateBucketInput{
+			Bucket: aws.String("new-bucket"),
+		})
+		assert.NoError(t, err)
 
-	// Verify bucket was created
-	bucket, err := store.Queries.GetBucket(context.Background(), "new-bucket")
-	assert.NoError(t, err)
-	assert.Equal(t, "new-bucket", bucket.Name)
-	assert.Equal(t, "us-east-1", bucket.Region)
+		// Verify bucket was created
+		bucket, err := store.Queries.GetBucket(context.Background(), "new-bucket")
+		assert.NoError(t, err)
+		assert.Equal(t, "new-bucket", bucket.Name)
+		assert.Equal(t, "us-east-1", bucket.Region)
+	})
 }

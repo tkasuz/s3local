@@ -23,6 +23,7 @@ import (
 	"github.com/tkasuz/s3local/internal/handlers/bucket"
 	"github.com/tkasuz/s3local/internal/handlers/ctx"
 	"github.com/tkasuz/s3local/internal/handlers/object"
+	"github.com/tkasuz/s3local/internal/worker"
 )
 
 const (
@@ -32,17 +33,89 @@ const (
 	shutdownTimeout = 30 * time.Second
 )
 
+// bucketPutHandler routes PUT /{bucket} requests based on query parameters
+func bucketPutHandler(w http.ResponseWriter, r *http.Request) {
+	if r.URL.Query().Has("tagging") {
+		bucket.PutBucketTagging(w, r)
+		return
+	}
+	if r.URL.Query().Has("policy") {
+		bucket.PutBucketPolicy(w, r)
+		return
+	}
+	bucket.CreateBucket(w, r)
+}
+
+// bucketGetHandler routes GET /{bucket} requests based on query parameters
+func bucketGetHandler(w http.ResponseWriter, r *http.Request) {
+	if r.URL.Query().Has("tagging") {
+		bucket.GetBucketTagging(w, r)
+		return
+	}
+	if r.URL.Query().Has("policy") {
+		bucket.GetBucketPolicy(w, r)
+		return
+	}
+	object.ListObjectsV2(w, r)
+}
+
+// bucketDeleteHandler routes DELETE /{bucket} requests based on query parameters
+func bucketDeleteHandler(w http.ResponseWriter, r *http.Request) {
+	if r.URL.Query().Has("tagging") {
+		bucket.DeleteBucketTagging(w, r)
+		return
+	}
+	if r.URL.Query().Has("policy") {
+		bucket.DeleteBucketPolicy(w, r)
+		return
+	}
+	bucket.DeleteBucket(w, r)
+}
+
+// objectPutHandler routes PUT /{bucket}/{key} requests based on query parameters
+func objectPutHandler(w http.ResponseWriter, r *http.Request) {
+	if r.URL.Query().Has("tagging") {
+		object.PutObjectTagging(w, r)
+		return
+	}
+	object.PutObject(w, r)
+}
+
+// objectGetHandler routes GET /{bucket}/{key} requests based on query parameters
+func objectGetHandler(w http.ResponseWriter, r *http.Request) {
+	if r.URL.Query().Has("tagging") {
+		object.GetObjectTagging(w, r)
+		return
+	}
+	object.GetObject(w, r)
+}
+
+// objectDeleteHandler routes DELETE /{bucket}/{key} requests based on query parameters
+func objectDeleteHandler(w http.ResponseWriter, r *http.Request) {
+	if r.URL.Query().Has("tagging") {
+		object.DeleteObjectTagging(w, r)
+		return
+	}
+	object.DeleteObject(w, r)
+}
+
 func registerRoutes(r chi.Router) {
 	r.Get("/", bucket.ListBuckets)
 	r.Route("/{bucket}", func(r chi.Router) {
-		r.Put("/", bucket.CreateBucket)
-		r.Delete("/", bucket.DeleteBucket)
+		r.Use(ctx.WithBucketName())
+
+		// Bucket operations with query parameter routing
+		r.Put("/", bucketPutHandler)
+		r.Get("/", bucketGetHandler)
+		r.Delete("/", bucketDeleteHandler)
 		r.Head("/", bucket.HeadBucket)
-		r.Get("/", object.ListObjectsV2)
-		r.Route("/{key:.*}", func(r chi.Router) {
-			r.Put("/", object.PutObject)
-			r.Get("/", object.GetObject)
-			r.Delete("/", object.DeleteObject)
+
+		r.Route("/{key}", func(r chi.Router) {
+			r.Use(ctx.WithObjectKey())
+			r.Put("/", objectPutHandler)
+			r.Get("/", objectGetHandler)
+			r.Head("/", object.HeadObject)
+			r.Delete("/", objectDeleteHandler)
 		})
 	})
 }
@@ -112,6 +185,13 @@ func main() {
 
 	registerRoutes(r)
 
+	// Create and start notification worker
+	notificationWorker := worker.NewNotificationWorker(store)
+	workerCtx, workerCancel := context.WithCancel(context.Background())
+	defer workerCancel()
+
+	go notificationWorker.Start(workerCtx)
+
 	// Create server with HTTP/2 support
 	addr := fmt.Sprintf("%s:%s", host, port)
 	srv := &http.Server{
@@ -140,12 +220,15 @@ func main() {
 
 	log.Println("Shutting down server...")
 
+	// Stop the notification worker
+	notificationWorker.Stop()
+
 	// Create shutdown context with timeout
-	ctx, cancel := context.WithTimeout(context.Background(), shutdownTimeout)
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), shutdownTimeout)
 	defer cancel()
 
 	// Attempt graceful shutdown
-	if err := srv.Shutdown(ctx); err != nil {
+	if err := srv.Shutdown(shutdownCtx); err != nil {
 		log.Printf("Server forced to shutdown: %v", err)
 	}
 

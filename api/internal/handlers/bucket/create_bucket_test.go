@@ -8,7 +8,6 @@ import (
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
-	"github.com/aws/aws-sdk-go-v2/service/s3/types"
 	"github.com/go-chi/chi/v5"
 	"github.com/stretchr/testify/assert"
 	"github.com/tkasuz/s3local/internal/handlers/ctx"
@@ -20,10 +19,12 @@ func TestCreateBucket(t *testing.T) {
 	store := ctx.GetStore(testCtx)
 
 	r := chi.NewRouter()
-	r.Use(ctx.WithBucketName())
-	r.Use(ctx.WithStore(store))
-	r.Put("/{bucketName}", func(w http.ResponseWriter, r *http.Request) {
-		CreateBucket(w, r)
+	r.Route("/{bucket}", func(r chi.Router) {
+		r.Use(ctx.WithBucketName())
+		r.Use(ctx.WithStore(store))
+		r.Put("/", func(w http.ResponseWriter, req *http.Request) {
+			CreateBucket(w, req)
+		})
 	})
 
 	ts := httptest.NewServer(r)
@@ -34,9 +35,6 @@ func TestCreateBucket(t *testing.T) {
 	// Call CreateBucket via AWS SDK
 	_, err := s3Client.CreateBucket(context.Background(), &s3.CreateBucketInput{
 		Bucket: aws.String("new-bucket"),
-		CreateBucketConfiguration: &types.CreateBucketConfiguration{
-			LocationConstraint: "us-east-1",
-		},
 	})
 	assert.NoError(t, err)
 

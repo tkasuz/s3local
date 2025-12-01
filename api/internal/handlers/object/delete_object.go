@@ -3,7 +3,6 @@ package object
 import (
 	"net/http"
 
-	"github.com/go-chi/chi/v5"
 	"github.com/tkasuz/s3local/internal/db"
 	"github.com/tkasuz/s3local/internal/handlers/ctx"
 	"github.com/tkasuz/s3local/internal/handlers/s3error"
@@ -12,12 +11,12 @@ import (
 // DeleteObject handles DELETE /{bucket}/{key}
 func DeleteObject(w http.ResponseWriter, r *http.Request) {
 	store := ctx.GetStore(r.Context())
-	bucket := chi.URLParam(r, "bucket")
-	key := chi.URLParam(r, "key")
+	bucketName := ctx.GetBucketName(r.Context())
+	objectKey := ctx.GetObjectKey(r.Context())
 
 	err := store.Queries.DeleteObject(r.Context(), db.DeleteObjectParams{
-		BucketName: bucket,
-		Key:        key,
+		BucketName: bucketName,
+		Key:        objectKey,
 	})
 	if err != nil {
 		s3error.NewInternalError(err).WriteError(w)

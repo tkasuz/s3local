@@ -6,7 +6,6 @@ import (
 	"net/http"
 	"strconv"
 
-	"github.com/go-chi/chi/v5"
 	"github.com/tkasuz/s3local/internal/db"
 	"github.com/tkasuz/s3local/internal/handlers/ctx"
 	"github.com/tkasuz/s3local/internal/handlers/s3error"
@@ -15,15 +14,15 @@ import (
 // GetObject handles GET /{bucket}/{key}
 func GetObject(w http.ResponseWriter, r *http.Request) {
 	store := ctx.GetStore(r.Context())
-	bucket := chi.URLParam(r, "bucket")
-	key := chi.URLParam(r, "key")
+	bucketName := ctx.GetBucketName(r.Context())
+	objectKey := ctx.GetObjectKey(r.Context())
 
 	obj, err := store.Queries.GetObject(r.Context(), db.GetObjectParams{
-		BucketName: bucket,
-		Key:        key,
+		BucketName: bucketName,
+		Key:        objectKey,
 	})
 	if err == sql.ErrNoRows {
-		s3error.NewNoSuchKeyError(key).WriteError(w)
+		s3error.NewNoSuchKeyError(objectKey).WriteError(w)
 		return
 	}
 	if err != nil {

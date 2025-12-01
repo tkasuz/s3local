@@ -3,8 +3,8 @@ package ctx
 import (
 	"context"
 	"net/http"
-	"strings"
 
+	"github.com/go-chi/chi/v5"
 	"github.com/tkasuz/s3local/internal/config"
 	"github.com/tkasuz/s3local/internal/db"
 )
@@ -13,8 +13,10 @@ type ctxKey string
 
 const (
 	// StoreKey is exported for testing purposes
-	StoreKey ctxKey = "store"
-	cfgKey   ctxKey = "cfg"
+	StoreKey      ctxKey = "store"
+	cfgKey        ctxKey = "cfg"
+	bucketNameKey ctxKey = "bucketName"
+	objectKeyKey  ctxKey = "objectKey"
 )
 
 // WithStore injects store into request context
@@ -54,24 +56,32 @@ func GetConfig(ctx context.Context) *config.Config {
 func WithBucketName() func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			hostname := r.Header.Get("Hostname")
-			bucketName := ""
-			if len(strings.Split(hostname, ".")) > 2 {
-				bucketName = strings.Split(hostname, ".")[0]
-			} else {
-				parts := strings.Split(r.URL.Path, "/")
-				if len(parts) > 1 {
-					bucketName = parts[1]
-				}
-			}
-			ctx := context.WithValue(r.Context(), "bucketName", bucketName)
+			bucket := chi.URLParam(r, "bucket")
+			ctx := context.WithValue(r.Context(), bucketNameKey, bucket)
 			next.ServeHTTP(w, r.WithContext(ctx))
 		})
 	}
 }
 
 func GetBucketName(ctx context.Context) string {
-	if bucketName, ok := ctx.Value("bucketName").(string); ok {
+	if bucketName, ok := ctx.Value(bucketNameKey).(string); ok {
+		return bucketName
+	}
+	return ""
+}
+
+func WithObjectKey() func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			key := chi.URLParam(r, "key")
+			ctx := context.WithValue(r.Context(), objectKeyKey, key)
+			next.ServeHTTP(w, r.WithContext(ctx))
+		})
+	}
+}
+
+func GetObjectKey(ctx context.Context) string {
+	if bucketName, ok := ctx.Value(objectKeyKey).(string); ok {
 		return bucketName
 	}
 	return ""

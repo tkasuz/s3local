@@ -1,3 +1,5 @@
+import uuid
+
 import boto3
 from botocore.client import Config
 from botocore.exceptions import ClientError
@@ -10,8 +12,8 @@ def create_s3_client():
         endpoint_url='http://localhost:8080',
         aws_access_key_id='test',
         aws_secret_access_key='test',
-        config=Config(signature_version='s3v4'),
-        region_name='us-east-1'
+        config=Config(signature_version='s3v4', s3={"addressing_style": "path"}),
+        region_name='us-east-1',
     )
 
 
@@ -133,10 +135,12 @@ def main():
     print("=" * 60)
     print("S3Local Test Suite")
     print("=" * 60)
-    
+
     s3_client = create_s3_client()
-    bucket_name = "test-bucket"
-    object_key = "test-file.txt"
+
+    # Generate unique bucket name for this test run
+    bucket_name = f"test-bucket-{str(uuid.uuid4())[:8]}"
+    object_key = str(uuid.uuid4())
     object_content = "Hello from S3Local!"
     
     results = []

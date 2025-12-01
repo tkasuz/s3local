@@ -10,7 +10,6 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/go-chi/chi/v5"
 	"github.com/tkasuz/s3local/internal/db"
 	"github.com/tkasuz/s3local/internal/handlers/ctx"
 	"github.com/tkasuz/s3local/internal/handlers/s3error"
@@ -19,8 +18,8 @@ import (
 // PutObject handles PUT /{bucket}/{key}
 func PutObject(w http.ResponseWriter, r *http.Request) {
 	store := ctx.GetStore(r.Context())
-	bucket := chi.URLParam(r, "bucket")
-	key := chi.URLParam(r, "key")
+	bucketName := ctx.GetBucketName(r.Context())
+	objectKey := ctx.GetObjectKey(r.Context())
 
 	// Read the body into memory
 	var buf bytes.Buffer
@@ -42,8 +41,8 @@ func PutObject(w http.ResponseWriter, r *http.Request) {
 
 	// Check if object exists
 	exists, err := store.Queries.ObjectExists(r.Context(), db.ObjectExistsParams{
-		BucketName: bucket,
-		Key:        key,
+		BucketName: bucketName,
+		Key:        objectKey,
 	})
 	if err != nil {
 		s3error.NewInternalError(err).WriteError(w)
@@ -53,8 +52,8 @@ func PutObject(w http.ResponseWriter, r *http.Request) {
 	if exists {
 		// Update existing object
 		err = store.Queries.UpdateObject(r.Context(), db.UpdateObjectParams{
-			BucketName:         bucket,
-			Key:                key,
+			BucketName:         bucketName,
+			Key:                objectKey,
 			Data:               data,
 			Size:               int64(len(data)),
 			ETag:               etag,
@@ -67,8 +66,8 @@ func PutObject(w http.ResponseWriter, r *http.Request) {
 	} else {
 		// Create new object
 		_, err = store.Queries.CreateObject(r.Context(), db.CreateObjectParams{
-			BucketName:         bucket,
-			Key:                key,
+			BucketName:         bucketName,
+			Key:                objectKey,
 			Data:               data,
 			Size:               int64(len(data)),
 			ETag:               etag,
@@ -86,8 +85,8 @@ func PutObject(w http.ResponseWriter, r *http.Request) {
 	}
 
 	objectID, err := store.Queries.GetObjectID(r.Context(), db.GetObjectIDParams{
-		BucketName: bucket,
-		Key:        key,
+		BucketName: bucketName,
+		Key:        objectKey,
 	})
 	if err != nil {
 		s3error.NewInternalError(err).WriteError(w)
@@ -109,7 +108,7 @@ func PutObject(w http.ResponseWriter, r *http.Request) {
 	}
 
 	store.Queries.CreateEvent(r.Context(), db.CreateEventParams{
-		BucketName: bucket,
+		BucketName: bucketName,
 		ObjectID:   objectID,
 	})
 

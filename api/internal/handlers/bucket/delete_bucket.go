@@ -4,7 +4,6 @@ import (
 	"database/sql"
 	"net/http"
 
-	"github.com/go-chi/chi/v5"
 	"github.com/tkasuz/s3local/internal/handlers/ctx"
 	"github.com/tkasuz/s3local/internal/handlers/s3error"
 )
@@ -12,7 +11,7 @@ import (
 // DeleteBucket handles DELETE /{bucket}
 func DeleteBucket(w http.ResponseWriter, r *http.Request) {
 	store := ctx.GetStore(r.Context())
-	bucketName := chi.URLParam(r, "bucket")
+	bucketName := ctx.GetBucketName(r.Context())
 
 	// Check if bucket exists
 	_, err := store.Queries.GetBucket(r.Context(), bucketName)

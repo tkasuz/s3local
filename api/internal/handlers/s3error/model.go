@@ -18,6 +18,14 @@ const (
 	// Object
 	ErrCodeNoSuchKey ErrorCode = "NoSuchKey"
 
+	// Tagging
+	ErrCodeInvalidTag     ErrorCode = "InvalidTag"
+	ErrCodeMalformedXML   ErrorCode = "MalformedXML"
+
+	// Policy
+	ErrCodeNoSuchBucketPolicy ErrorCode = "NoSuchBucketPolicy"
+	ErrCodeMalformedPolicy    ErrorCode = "MalformedPolicy"
+
 	// General
 	ErrCodeInternalError ErrorCode = "InternalError"
 )
@@ -42,10 +50,14 @@ func (e *Error) WriteError(w http.ResponseWriter) {
 		w.WriteHeader(http.StatusNotFound)
 	case string(ErrCodeNoSuchBucket):
 		w.WriteHeader(http.StatusNotFound)
+	case string(ErrCodeNoSuchBucketPolicy):
+		w.WriteHeader(http.StatusNotFound)
 	case string(ErrCodeBucketAlreadyExists), string(ErrCodeBucketAlreadyOwnedByYou):
 		w.WriteHeader(http.StatusConflict)
 	case string(ErrCodeBucketNotEmpty):
 		w.WriteHeader(http.StatusConflict)
+	case string(ErrCodeInvalidTag), string(ErrCodeMalformedXML), string(ErrCodeMalformedPolicy):
+		w.WriteHeader(http.StatusBadRequest)
 	default:
 		w.WriteHeader(http.StatusInternalServerError)
 	}
@@ -106,5 +118,38 @@ func NewInternalError(err error) *Error {
 	return &Error{
 		Code:    string(ErrCodeInternalError),
 		Message: msg,
+	}
+}
+
+// NewInvalidTagError creates an InvalidTag error
+func NewInvalidTagError(message string) *Error {
+	return &Error{
+		Code:    string(ErrCodeInvalidTag),
+		Message: message,
+	}
+}
+
+// NewMalformedXMLError creates a MalformedXML error
+func NewMalformedXMLError() *Error {
+	return &Error{
+		Code:    string(ErrCodeMalformedXML),
+		Message: "The XML you provided was not well-formed or did not validate against our published schema.",
+	}
+}
+
+// NewNoSuchBucketPolicyError creates a NoSuchBucketPolicy error
+func NewNoSuchBucketPolicyError(bucket string) *Error {
+	return &Error{
+		Code:     string(ErrCodeNoSuchBucketPolicy),
+		Message:  "The bucket policy does not exist.",
+		Resource: bucket,
+	}
+}
+
+// NewMalformedPolicyError creates a MalformedPolicy error
+func NewMalformedPolicyError(message string) *Error {
+	return &Error{
+		Code:    string(ErrCodeMalformedPolicy),
+		Message: message,
 	}
 }

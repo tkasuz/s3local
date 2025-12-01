@@ -4,14 +4,13 @@ import (
 	"database/sql"
 	"net/http"
 
-	"github.com/go-chi/chi/v5"
 	"github.com/tkasuz/s3local/internal/handlers/ctx"
 )
 
 // HeadBucket handles HEAD /{bucket}
 func HeadBucket(w http.ResponseWriter, r *http.Request) {
 	store := ctx.GetStore(r.Context())
-	bucketName := chi.URLParam(r, "bucket")
+	bucketName := ctx.GetBucketName(r.Context())
 
 	bucket, err := store.Queries.GetBucket(r.Context(), bucketName)
 	if err != nil {

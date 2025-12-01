@@ -26,6 +26,11 @@ SELECT id, bucket_name, key, data, size, etag, content_type, content_encoding,
 FROM objects
 WHERE bucket_name = ? AND key = ?;
 
+-- name: GetObjectByID :one
+SELECT sqlc.embed(objects)
+FROM objects
+WHERE id = ?;
+
 -- name: GetObjectMetadata :one
 SELECT id, bucket_name, key, size, etag, content_type, content_encoding,
        content_disposition, cache_control, expires, storage_class,

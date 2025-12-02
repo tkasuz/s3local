@@ -145,16 +145,15 @@ func main() {
 		dbPath = defaultDBPath
 	}
 
-	dbURL := fmt.Sprintf("sqlite://%s?_fk=1", dbPath)
-	if err := db.RunMigrations(dbURL); err != nil {
-		log.Fatalf("Failed to run migrations: %v", err)
-	}
-
 	database, err := sql.Open("sqlite3", dbPath+"?_foreign_keys=on")
 	if err != nil {
 		log.Fatalf("Failed to open database: %v", err)
 	}
 	defer database.Close()
+
+	if err := db.RunMigrations(database); err != nil {
+		log.Fatalf("Failed to run migrations: %v", err)
+	}
 
 	queries := db.New(database)
 	store := db.NewStore(database, queries)

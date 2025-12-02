@@ -1,61 +1,47 @@
 package db
 
 import (
-	"context"
+	"database/sql"
 	"embed"
 	"fmt"
-	"io/fs"
-	"log"
-	"os"
-	"path/filepath"
 
-	"ariga.io/atlas-go-sdk/atlasexec"
+	"github.com/golang-migrate/migrate/v4"
+	"github.com/golang-migrate/migrate/v4/database/sqlite3"
+	"github.com/golang-migrate/migrate/v4/source/iofs"
 )
 
-//go:embed schemas/*.sql
-var schemasFS embed.FS
+//go:embed migrations/*.sql
+var migrationsFS embed.FS
 
-func RunMigrations(dbURL string) error {
-	// Extract the schemas subdirectory from the embedded FS
-	schemasSubFS, err := fs.Sub(schemasFS, "schemas")
+func RunMigrations(db *sql.DB) error {
+	// Create iofs source from embedded filesystem
+	sourceDriver, err := iofs.New(migrationsFS, "migrations")
 	if err != nil {
-		return fmt.Errorf("failed to create sub filesystem: %w", err)
+		return fmt.Errorf("failed to create source driver: %w", err)
 	}
 
-	// Create a working directory and write schema files to it
-	workdir, err := atlasexec.NewWorkingDir()
+	// Create database driver
+	dbDriver, err := sqlite3.WithInstance(db, &sqlite3.Config{})
 	if err != nil {
-		log.Fatalf("failed to load working directory: %v", err)
+		return fmt.Errorf("failed to create database driver: %w", err)
 	}
-	defer workdir.Close()
 
-	// Write the schema.sql file from embedded FS to working directory
-	schemaContent, err := fs.ReadFile(schemasSubFS, "schema.sql")
+	// Create migrate instance
+	m, err := migrate.NewWithInstance(
+		"iofs",
+		sourceDriver,
+		"sqlite3",
+		dbDriver,
+	)
 	if err != nil {
-		return fmt.Errorf("failed to read schema.sql: %w", err)
+		return fmt.Errorf("failed to create migrate instance: %w", err)
 	}
 
-	schemaPath := filepath.Join(workdir.Path(), "schema.sql")
-	if err := os.WriteFile(schemaPath, schemaContent, 0644); err != nil {
-		return fmt.Errorf("failed to write schema.sql: %w", err)
+	// Run migrations
+	if err := m.Up(); err != nil && err != migrate.ErrNoChange {
+		return fmt.Errorf("failed to run migrations: %w", err)
 	}
 
-	client, err := atlasexec.NewClient(workdir.Path(), "atlas")
-	if err != nil {
-		log.Fatalf("failed to initialize client: %v", err)
-	}
-
-	// Apply schema using schema apply command
-	_, err = client.SchemaApply(context.Background(), &atlasexec.SchemaApplyParams{
-		URL:         dbURL,
-		To:          "file://schema.sql",
-		DevURL:      "sqlite://file?mode=memory&_fk=1",
-		AutoApprove: true,
-	})
-	if err != nil {
-		return fmt.Errorf("failed to apply schema: %w", err)
-	}
-
-	fmt.Println("Schema applied successfully")
+	fmt.Println("Migrations applied successfully")
 	return nil
 }

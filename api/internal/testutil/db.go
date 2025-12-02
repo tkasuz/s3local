@@ -33,9 +33,13 @@ func initTemplateDB() {
 		tmpfile.Close()
 		templateDBPath = tmpfile.Name()
 
-		// Run migrations on the template database
-		dbURL := fmt.Sprintf("sqlite://%s?_fk=1", templateDBPath)
-		if err := db.RunMigrations(dbURL); err != nil {
+		// Open the database
+		database, err := sql.Open("sqlite3", templateDBPath+"?_foreign_keys=on")
+		if err != nil {
+			setupErr = fmt.Errorf("failed to open sqlite: %w", err)
+			return
+		}
+		if err := db.RunMigrations(database); err != nil {
 			setupErr = fmt.Errorf("failed to run migrations on template: %w", err)
 			os.Remove(templateDBPath)
 			return

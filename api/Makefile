@@ -5,7 +5,7 @@ BINARY_NAME=s3local
 BIN_DIR=bin
 CMD_DIR=cmd/s3local
 DB_PATH=s3local.db
-MIGRATIONS_DIR=migrations
+MIGRATIONS_DIR=internal/db/migrations
 
 # Default target
 all: build
@@ -87,13 +87,20 @@ mocks:
 ## db-migrate: Run database migrations
 db-migrate:
 	@echo "Running database migrations..."
-	@atlas migrate apply --env local --url "sqlite://$(DB_PATH)"
+	@migrate -path $(MIGRATIONS_DIR) -database "sqlite3://$(DB_PATH)" up
 	@echo "Migrations complete"
 
-## db-create: Create a new migration
+## db-migrate-down: Rollback last migration
+db-migrate-down:
+	@echo "Rolling back last migration..."
+	@migrate -path $(MIGRATIONS_DIR) -database "sqlite3://$(DB_PATH)" down 1
+	@echo "Rollback complete"
+
+## db-create: Create a new migration (usage: make db-create name=migration_name)
 db-create:
-	@echo "Creating new migration..."
-	@atlas migrate diff $(name) --env local
+	@if [ -z "$(name)" ]; then echo "Error: name is required. Usage: make db-create name=migration_name"; exit 1; fi
+	@echo "Creating new migration: $(name)..."
+	@migrate create -ext sql -dir $(MIGRATIONS_DIR) -seq $(name)
 	@echo "Migration created"
 
 ## db-reset: Reset the database (WARNING: destructive)
@@ -105,13 +112,3 @@ db-reset:
 ## db-setup: Create database and run migrations
 db-setup: db-reset db-migrate
 	@echo "Database setup complete"
-
-## run-sqlite: Run with SQLite storage backend
-run-sqlite: build db-migrate
-	@echo "Starting $(BINARY_NAME) with SQLite backend..."
-	@STORAGE_BACKEND=sqlite DB_PATH=$(DB_PATH) ./$(BIN_DIR)/$(BINARY_NAME)
-
-## run-memory: Run with in-memory storage backend
-run-memory: build
-	@echo "Starting $(BINARY_NAME) with in-memory backend..."
-	@STORAGE_BACKEND=memory ./$(BIN_DIR)/$(BINARY_NAME)

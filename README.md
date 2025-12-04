@@ -4,6 +4,8 @@
 
 **A lightweight, S3-compatible local storage server with event-driven architecture**
 
+<img width="1300" height="686" alt="Image" src="https://github.com/user-attachments/assets/3addaf4c-9db6-4e97-ac34-2448f1917b8d" />
+
 [![Go](https://img.shields.io/badge/Go-1.23+-00ADD8?style=flat&logo=go)](https://go.dev/)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Container](https://img.shields.io/badge/container-ghcr.io-purple)](https://github.com/tkasuz/s3local/pkgs/container/s3local%2Fs3local)
@@ -21,11 +23,41 @@ S3Local is a lightweight, self-contained S3-compatible storage server designed f
 ## Features
 
 ### Core Capabilities
-- **S3-Compatible API** - Full compatibility with AWS S3 SDKs and CLI tools
+- **S3-Compatible API** - Implements core S3 operations compatible with AWS SDKs and CLI tools
 - **Event-Driven Architecture** - Real-time event notifications for S3 operations
 - **Multi-Format Support** - Works with any S3 client library
 - **Lightweight & Fast** - Single binary with minimal dependencies
 - **SQLite Backend** - Reliable local storage with zero configuration
+
+### Supported S3 API Operations
+
+#### Bucket Operations
+- `CreateBucket` - Create a new bucket
+- `DeleteBucket` - Delete an empty bucket
+- `HeadBucket` - Check if a bucket exists
+- `ListBuckets` - List all buckets
+- `PutBucketTagging` - Set bucket tags
+- `GetBucketTagging` - Retrieve bucket tags
+- `DeleteBucketTagging` - Remove bucket tags
+- `PutBucketPolicy` - Set bucket policy
+- `GetBucketPolicy` - Retrieve bucket policy
+- `DeleteBucketPolicy` - Remove bucket policy
+- `PutBucketNotificationConfiguration` - Configure event notifications
+- `GetBucketNotificationConfiguration` - Retrieve notification configuration
+
+#### Object Operations
+- `PutObject` - Upload objects (including folder markers with trailing `/`)
+- `GetObject` - Download objects
+- `DeleteObject` - Delete objects
+- `HeadObject` - Retrieve object metadata
+- `ListObjectsV2` - List objects with support for:
+  - Prefix filtering
+  - Delimiter-based hierarchical listing
+  - CommonPrefixes for folder-like navigation
+  - Pagination with continuation tokens
+- `PutObjectTagging` - Set object tags
+- `GetObjectTagging` - Retrieve object tags
+- `DeleteObjectTagging` - Remove object tags
 
 ### Event Notifications
 - **Lambda Integration** - HTTP webhook support for serverless functions

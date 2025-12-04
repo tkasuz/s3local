@@ -274,9 +274,8 @@ function BucketDetailPage() {
           </svg>
           <button
             onClick={() => handleBreadcrumbClick('')}
-            className={`font-medium transition-colors hover:text-blue-600 ${
-              !prefix ? 'text-blue-600' : 'text-gray-600'
-            }`}
+            className={`font-medium transition-colors hover:text-blue-600 ${!prefix ? 'text-blue-600' : 'text-gray-600'
+              }`}
           >
             Root
           </button>
@@ -287,9 +286,8 @@ function BucketDetailPage() {
               </svg>
               <button
                 onClick={() => handleBreadcrumbClick(crumb.path)}
-                className={`font-medium transition-colors hover:text-blue-600 ${
-                  index === breadcrumbs.length - 1 ? 'text-blue-600' : 'text-gray-600'
-                }`}
+                className={`font-medium transition-colors hover:text-blue-600 ${index === breadcrumbs.length - 1 ? 'text-blue-600' : 'text-gray-600'
+                  }`}
               >
                 {crumb.name}
               </button>
@@ -324,11 +322,10 @@ function BucketDetailPage() {
                   <tr key={item.fullPath} className="hover:bg-blue-50/50 transition-colors">
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex items-center">
-                        <div className={`flex-shrink-0 w-8 h-8 rounded-lg flex items-center justify-center mr-3 ${
-                          item.type === 'folder' 
-                            ? 'bg-blue-100' 
+                        <div className={`flex-shrink-0 w-8 h-8 rounded-lg flex items-center justify-center mr-3 ${item.type === 'folder'
+                            ? 'bg-blue-100'
                             : 'bg-gray-100'
-                        }`}>
+                          }`}>
                           {item.type === 'folder' ? (
                             <svg className="w-5 h-5 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
@@ -368,20 +365,22 @@ function BucketDetailPage() {
                       </span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-right">
-                      <button
-                        onClick={() => {
-                          const itemType = item.type === 'folder' ? 'folder' : 'file'
-                          if (confirm(`Are you sure you want to delete this ${itemType} "${item.name}"?`)) {
-                            deleteMutation.mutate(item.fullPath)
-                          }
-                        }}
-                        className="inline-flex items-center px-3 py-1.5 rounded-lg text-sm font-medium text-red-600 hover:bg-red-50 transition-colors"
-                      >
-                        <svg className="w-4 h-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                        </svg>
-                        Delete
-                      </button>
+                      {item.type === 'folder' ? '-' :
+                        <button
+                          onClick={() => {
+                            const itemType = item.type === 'folder' ? 'folder' : 'file'
+                            if (confirm(`Are you sure you want to delete this ${itemType} "${item.name}"?`)) {
+                              deleteMutation.mutate(item.fullPath)
+                            }
+                          }}
+                          className="inline-flex items-center px-3 py-1.5 rounded-lg text-sm font-medium text-red-600 hover:bg-red-50 transition-colors"
+                        >
+                          <svg className="w-4 h-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                          </svg>
+                          Delete
+                        </button>
+                      }
                     </td>
                   </tr>
                 ))}

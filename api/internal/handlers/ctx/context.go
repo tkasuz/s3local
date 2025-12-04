@@ -73,7 +73,24 @@ func GetBucketName(ctx context.Context) string {
 func WithObjectKey() func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			key := chi.URLParam(r, "key")
+			// Extract the full key from the URL path
+			// URL pattern is /{bucket}/{key...} where key can contain slashes
+			bucket := chi.URLParam(r, "bucket")
+
+			// Remove leading slash and bucket name to get the key
+			// Example: "/mybucket/folder1/file.txt" -> "folder1/file.txt"
+			path := r.URL.Path
+			if len(path) > 0 && path[0] == '/' {
+				path = path[1:] // Remove leading slash
+			}
+
+			// Remove bucket name and the following slash
+			prefix := bucket + "/"
+			key := ""
+			if len(path) > len(prefix) && path[:len(prefix)] == prefix {
+				key = path[len(prefix):]
+			}
+
 			ctx := context.WithValue(r.Context(), objectKeyKey, key)
 			next.ServeHTTP(w, r.WithContext(ctx))
 		})

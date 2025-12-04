@@ -118,12 +118,12 @@ func registerRoutes(r chi.Router) {
 		r.Delete("/", bucketDeleteHandler)
 		r.Head("/", bucket.HeadBucket)
 
-		r.Route("/{key}", func(r chi.Router) {
-			r.Use(ctx.WithObjectKey())
-			r.Put("/", objectPutHandler)
-			r.Get("/", objectGetHandler)
-			r.Head("/", object.HeadObject)
-			r.Delete("/", objectDeleteHandler)
+		// Use wildcard to match any object key path including nested paths and trailing slashes
+		r.With(ctx.WithObjectKey()).Group(func(r chi.Router) {
+			r.Put("/*", objectPutHandler)
+			r.Get("/*", objectGetHandler)
+			r.Head("/*", object.HeadObject)
+			r.Delete("/*", objectDeleteHandler)
 		})
 	})
 }

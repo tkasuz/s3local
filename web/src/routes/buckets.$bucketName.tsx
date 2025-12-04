@@ -5,10 +5,6 @@ import {
   listObjects,
   putObject,
   deleteObject,
-  getBucketPolicy,
-  putBucketPolicy,
-  getBucketNotificationConfiguration,
-  putBucketNotificationConfiguration,
   type Tag,
 } from '../lib/s3Service'
 
@@ -35,62 +31,69 @@ function BucketDetailPage() {
   const { prefix = '' } = Route.useSearch()
   const queryClient = useQueryClient()
   const [showUploadModal, setShowUploadModal] = useState(false)
-  const [showPolicyModal, setShowPolicyModal] = useState(false)
-  const [showNotificationModal, setShowNotificationModal] = useState(false)
+  const [showCreateFolderModal, setShowCreateFolderModal] = useState(false)
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
   const [objectKey, setObjectKey] = useState('')
+  const [folderName, setFolderName] = useState('')
   const [tags, setTags] = useState<Tag[]>([])
   const [newTagKey, setNewTagKey] = useState('')
   const [newTagValue, setNewTagValue] = useState('')
-  const [policy, setPolicy] = useState('')
-  const [notificationConfig, setNotificationConfig] = useState('')
 
-  const { data: allObjects, isLoading } = useQuery({
-    queryKey: ['objects', bucketName],
-    queryFn: () => listObjects(bucketName),
+  const { data: listResult, isLoading } = useQuery({
+    queryKey: ['objects', bucketName, prefix],
+    queryFn: () => listObjects(bucketName, prefix, '/'),
   })
 
-  const { data: bucketPolicy } = useQuery({
-    queryKey: ['policy', bucketName],
-    queryFn: () => getBucketPolicy(bucketName),
-    enabled: showPolicyModal,
-  })
-
-  const { data: bucketNotificationConfig } = useQuery({
-    queryKey: ['notification', bucketName],
-    queryFn: () => getBucketNotificationConfiguration(bucketName),
-    enabled: showNotificationModal,
-  })
 
   // Process objects to show folders and files in current prefix
   const currentItems = useMemo<FolderItem[]>(() => {
-    if (!allObjects) return []
+    if (!listResult) return []
 
-    const folders = new Set<string>()
-    const files: FolderItem[] = []
+    const folderMap = new Map<string, FolderItem>()
+    const fileItems: FolderItem[] = []
 
-    allObjects.forEach((obj) => {
+    // Process CommonPrefixes as folders
+    listResult.commonPrefixes.forEach((commonPrefix) => {
+      // Extract folder name from the full prefix
+      // For example: "folder1/subfolder/" -> "subfolder"
+      const folderName = commonPrefix.slice(prefix.length, -1) // Remove leading prefix and trailing /
+      if (folderName && !folderMap.has(folderName)) {
+        folderMap.set(folderName, {
+          name: folderName,
+          type: 'folder',
+          fullPath: commonPrefix,
+        })
+      }
+    })
+
+    // Process objects - check if they're folders (end with /) or files
+    listResult.objects.forEach((obj) => {
       const key = obj.Key || ''
-      
-      // Skip if key doesn't start with current prefix
-      if (!key.startsWith(prefix)) return
+
+      // Skip empty keys
+      if (!key) return
 
       // Get the relative path from current prefix
       const relativePath = key.substring(prefix.length)
-      
-      // Skip empty paths
+
+      // Skip if empty (this would be the folder marker itself)
       if (!relativePath) return
 
-      // Check if this is a folder or file
-      const slashIndex = relativePath.indexOf('/')
-      
-      if (slashIndex > 0) {
-        // This is a folder
-        const folderName = relativePath.substring(0, slashIndex)
-        folders.add(folderName)
+      // Check if this object is a folder marker (ends with /)
+      if (key.endsWith('/')) {
+        // This is a folder object
+        const folderName = relativePath.slice(0, -1) // Remove trailing /
+        // Only add if not already in folderMap (avoid duplicates with CommonPrefixes)
+        if (folderName && !folderMap.has(folderName)) {
+          folderMap.set(folderName, {
+            name: folderName,
+            type: 'folder',
+            fullPath: key,
+          })
+        }
       } else {
-        // This is a file in current directory
-        files.push({
+        // This is a regular file
+        fileItems.push({
           name: relativePath,
           type: 'file',
           fullPath: key,
@@ -100,15 +103,14 @@ function BucketDetailPage() {
       }
     })
 
-    // Convert folders to FolderItem
-    const folderItems: FolderItem[] = Array.from(folders).map((name) => ({
-      name,
-      type: 'folder',
-      fullPath: prefix + name + '/',
-    }))
+    // Convert folderMap to array and sort
+    const folderItems = Array.from(folderMap.values()).sort((a, b) => a.name.localeCompare(b.name))
 
-    return [...folderItems.sort((a, b) => a.name.localeCompare(b.name)), ...files.sort((a, b) => a.name.localeCompare(b.name))]
-  }, [allObjects, prefix])
+    return [
+      ...folderItems,
+      ...fileItems.sort((a, b) => a.name.localeCompare(b.name))
+    ]
+  }, [listResult, prefix])
 
   // Build breadcrumb path
   const breadcrumbs = useMemo(() => {
@@ -132,6 +134,19 @@ function BucketDetailPage() {
     },
   })
 
+  const createFolderMutation = useMutation({
+    mutationFn: (folderPath: string) => {
+      // Create an empty blob to represent the folder
+      const emptyFile = new File([''], '', { type: 'application/x-directory' })
+      return putObject(bucketName, folderPath, emptyFile, [])
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['objects', bucketName] })
+      setShowCreateFolderModal(false)
+      setFolderName('')
+    },
+  })
+
   const deleteMutation = useMutation({
     mutationFn: (key: string) => deleteObject(bucketName, key),
     onSuccess: () => {
@@ -139,21 +154,6 @@ function BucketDetailPage() {
     },
   })
 
-  const policyMutation = useMutation({
-    mutationFn: (policyText: string) => putBucketPolicy(bucketName, policyText),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['policy', bucketName] })
-      setShowPolicyModal(false)
-    },
-  })
-
-  const notificationMutation = useMutation({
-    mutationFn: (config: any) => putBucketNotificationConfiguration(bucketName, config),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['notification', bucketName] })
-      setShowNotificationModal(false)
-    },
-  })
 
   const handleAddTag = () => {
     if (newTagKey && newTagValue) {
@@ -194,23 +194,13 @@ function BucketDetailPage() {
     navigate({ search: { prefix: path } })
   }
 
-  const handleSavePolicy = (e: React.FormEvent) => {
+  const handleCreateFolder = (e: React.FormEvent) => {
     e.preventDefault()
-    try {
-      JSON.parse(policy)
-      policyMutation.mutate(policy)
-    } catch (error) {
-      alert('Invalid JSON policy')
-    }
-  }
-
-  const handleSaveNotification = (e: React.FormEvent) => {
-    e.preventDefault()
-    try {
-      const config = JSON.parse(notificationConfig)
-      notificationMutation.mutate(config)
-    } catch (error) {
-      alert('Invalid JSON configuration')
+    if (folderName) {
+      // Ensure folder name ends with /
+      const normalizedFolderName = folderName.endsWith('/') ? folderName : folderName + '/'
+      const folderPath = prefix + normalizedFolderName
+      createFolderMutation.mutate(folderPath)
     }
   }
 
@@ -257,32 +247,13 @@ function BucketDetailPage() {
 
           <div className="flex flex-wrap gap-3">
             <button
-              onClick={() => {
-                setShowPolicyModal(true)
-                setPolicy(bucketPolicy || '')
-              }}
+              onClick={() => setShowCreateFolderModal(true)}
               className="inline-flex items-center px-4 py-2.5 rounded-xl bg-white border-2 border-gray-200 hover:border-blue-300 hover:bg-blue-50 text-gray-700 font-medium transition-all shadow-sm hover:shadow"
             >
               <svg className="w-4 h-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 13h6m-3-3v6m-9 1V7a2 2 0 012-2h6l2 2h6a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2z" />
               </svg>
-              Policy
-            </button>
-            <button
-              onClick={() => {
-                setShowNotificationModal(true)
-                setNotificationConfig(
-                  bucketNotificationConfig
-                    ? JSON.stringify(bucketNotificationConfig, null, 2)
-                    : '{}'
-                )
-              }}
-              className="inline-flex items-center px-4 py-2.5 rounded-xl bg-white border-2 border-gray-200 hover:border-blue-300 hover:bg-blue-50 text-gray-700 font-medium transition-all shadow-sm hover:shadow"
-            >
-              <svg className="w-4 h-4 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
-              </svg>
-              Notifications
+              Create Folder
             </button>
             <button
               onClick={() => setShowUploadModal(true)}
@@ -303,9 +274,8 @@ function BucketDetailPage() {
           </svg>
           <button
             onClick={() => handleBreadcrumbClick('')}
-            className={`font-medium transition-colors hover:text-blue-600 ${
-              !prefix ? 'text-blue-600' : 'text-gray-600'
-            }`}
+            className={`font-medium transition-colors hover:text-blue-600 ${!prefix ? 'text-blue-600' : 'text-gray-600'
+              }`}
           >
             Root
           </button>
@@ -316,9 +286,8 @@ function BucketDetailPage() {
               </svg>
               <button
                 onClick={() => handleBreadcrumbClick(crumb.path)}
-                className={`font-medium transition-colors hover:text-blue-600 ${
-                  index === breadcrumbs.length - 1 ? 'text-blue-600' : 'text-gray-600'
-                }`}
+                className={`font-medium transition-colors hover:text-blue-600 ${index === breadcrumbs.length - 1 ? 'text-blue-600' : 'text-gray-600'
+                  }`}
               >
                 {crumb.name}
               </button>
@@ -353,11 +322,10 @@ function BucketDetailPage() {
                   <tr key={item.fullPath} className="hover:bg-blue-50/50 transition-colors">
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex items-center">
-                        <div className={`flex-shrink-0 w-8 h-8 rounded-lg flex items-center justify-center mr-3 ${
-                          item.type === 'folder' 
-                            ? 'bg-blue-100' 
+                        <div className={`flex-shrink-0 w-8 h-8 rounded-lg flex items-center justify-center mr-3 ${item.type === 'folder'
+                            ? 'bg-blue-100'
                             : 'bg-gray-100'
-                        }`}>
+                          }`}>
                           {item.type === 'folder' ? (
                             <svg className="w-5 h-5 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
@@ -397,10 +365,11 @@ function BucketDetailPage() {
                       </span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-right">
-                      {item.type === 'file' && (
+                      {item.type === 'folder' ? '-' :
                         <button
                           onClick={() => {
-                            if (confirm(`Are you sure you want to delete "${item.name}"?`)) {
+                            const itemType = item.type === 'folder' ? 'folder' : 'file'
+                            if (confirm(`Are you sure you want to delete this ${itemType} "${item.name}"?`)) {
                               deleteMutation.mutate(item.fullPath)
                             }
                           }}
@@ -411,7 +380,7 @@ function BucketDetailPage() {
                           </svg>
                           Delete
                         </button>
-                      )}
+                      }
                     </td>
                   </tr>
                 ))}
@@ -598,105 +567,85 @@ function BucketDetailPage() {
         </div>
       )}
 
-      {/* Policy Modal - Same as before */}
-      {showPolicyModal && (
+      {/* Create Folder Modal */}
+      {showCreateFolderModal && (
         <div className="fixed inset-0 z-50 overflow-y-auto">
-          <div className="flex items-center justify-center min-h-screen px-4">
+          <div className="flex items-center justify-center min-h-screen px-4 pt-4 pb-20">
             <div
-              className="fixed inset-0 bg-gray-900/75 backdrop-blur-sm"
-              onClick={() => setShowPolicyModal(false)}
+              className="fixed inset-0 bg-gray-900/75 backdrop-blur-sm transition-opacity"
+              onClick={() => setShowCreateFolderModal(false)}
             ></div>
-            <div className="relative z-10 inline-block bg-white rounded-2xl shadow-2xl transform transition-all sm:max-w-2xl sm:w-full max-h-[90vh] overflow-y-auto">
-              <div className="p-6">
-                <div className="flex items-center justify-between mb-6">
-                  <h3 className="text-xl font-bold text-gray-900">Bucket Policy</h3>
-                  <button onClick={() => setShowPolicyModal(false)} className="text-gray-400 hover:text-gray-600">
-                    <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                    </svg>
-                  </button>
-                </div>
-                <form onSubmit={handleSavePolicy} className="space-y-4">
-                  <textarea
-                    value={policy}
-                    onChange={(e) => setPolicy(e.target.value)}
-                    rows={15}
-                    className="w-full px-4 py-3 rounded-xl border-2 border-gray-200 focus:border-blue-500 focus:ring-4 focus:ring-blue-100 transition-all outline-none font-mono text-xs"
-                    placeholder='{"Version": "2012-10-17", "Statement": []}'
-                  />
-                  <div className="flex gap-3">
-                    <button
-                      type="submit"
-                      disabled={policyMutation.isPending}
-                      className="flex-1 px-5 py-3 bg-blue-600 text-white font-semibold rounded-xl hover:bg-blue-700 disabled:opacity-50"
-                    >
-                      {policyMutation.isPending ? 'Saving...' : 'Save Policy'}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setShowPolicyModal(false)}
-                      className="px-5 py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 font-semibold rounded-xl"
-                    >
-                      Cancel
-                    </button>
-                  </div>
-                  {policyMutation.isError && (
-                    <div className="rounded-xl bg-red-50 p-4">
-                      <p className="text-sm text-red-700">{(policyMutation.error as Error).message}</p>
-                    </div>
-                  )}
-                </form>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
 
-      {/* Notification Modal - Same as before */}
-      {showNotificationModal && (
-        <div className="fixed inset-0 z-50 overflow-y-auto">
-          <div className="flex items-center justify-center min-h-screen px-4">
-            <div
-              className="fixed inset-0 bg-gray-900/75 backdrop-blur-sm"
-              onClick={() => setShowNotificationModal(false)}
-            ></div>
-            <div className="relative z-10 inline-block bg-white rounded-2xl shadow-2xl transform transition-all sm:max-w-2xl sm:w-full max-h-[90vh] overflow-y-auto">
-              <div className="p-6">
+            <div className="relative z-10 inline-block align-bottom bg-white rounded-2xl text-left overflow-hidden shadow-2xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
+              <div className="bg-gradient-to-br from-white to-gray-50 px-6 pt-6 pb-4">
                 <div className="flex items-center justify-between mb-6">
-                  <h3 className="text-xl font-bold text-gray-900">Bucket Notifications</h3>
-                  <button onClick={() => setShowNotificationModal(false)} className="text-gray-400 hover:text-gray-600">
+                  <div className="flex items-center space-x-3">
+                    <div className="flex items-center justify-center w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-blue-600 shadow-md">
+                      <svg className="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 13h6m-3-3v6m-9 1V7a2 2 0 012-2h6l2 2h6a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2z" />
+                      </svg>
+                    </div>
+                    <div>
+                      <h3 className="text-xl font-bold text-gray-900">Create Folder</h3>
+                      {prefix && (
+                        <p className="text-xs text-gray-500 mt-0.5">In: {prefix}</p>
+                      )}
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => setShowCreateFolderModal(false)}
+                    className="text-gray-400 hover:text-gray-600 transition-colors"
+                  >
                     <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                     </svg>
                   </button>
                 </div>
-                <form onSubmit={handleSaveNotification} className="space-y-4">
-                  <textarea
-                    value={notificationConfig}
-                    onChange={(e) => setNotificationConfig(e.target.value)}
-                    rows={15}
-                    className="w-full px-4 py-3 rounded-xl border-2 border-gray-200 focus:border-blue-500 focus:ring-4 focus:ring-blue-100 transition-all outline-none font-mono text-xs"
-                    placeholder='{"QueueConfigurations": []}'
-                  />
-                  <div className="flex gap-3">
+
+                <form onSubmit={handleCreateFolder} className="space-y-5">
+                  <div>
+                    <label htmlFor="folderName" className="block text-sm font-semibold text-gray-700 mb-2">
+                      Folder Name
+                    </label>
+                    <input
+                      type="text"
+                      id="folderName"
+                      value={folderName}
+                      onChange={(e) => setFolderName(e.target.value)}
+                      required
+                      placeholder="my-folder"
+                      className="w-full px-4 py-3 rounded-xl border-2 border-gray-200 focus:border-blue-500 focus:ring-4 focus:ring-blue-100 transition-all outline-none"
+                    />
+                    {folderName && (
+                      <p className="mt-1 text-xs text-gray-500">
+                        Full path: {prefix}{folderName}{folderName.endsWith('/') ? '' : '/'}
+                      </p>
+                    )}
+                  </div>
+
+                  <div className="flex gap-3 pt-4">
                     <button
                       type="submit"
-                      disabled={notificationMutation.isPending}
-                      className="flex-1 px-5 py-3 bg-blue-600 text-white font-semibold rounded-xl hover:bg-blue-700 disabled:opacity-50"
+                      disabled={createFolderMutation.isPending}
+                      className="flex-1 px-5 py-3 bg-gradient-to-r from-blue-600 to-blue-700 text-white font-semibold rounded-xl shadow-lg hover:shadow-xl hover:scale-105 transform transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
                     >
-                      {notificationMutation.isPending ? 'Saving...' : 'Save Configuration'}
+                      {createFolderMutation.isPending ? 'Creating...' : 'Create Folder'}
                     </button>
                     <button
                       type="button"
-                      onClick={() => setShowNotificationModal(false)}
-                      className="px-5 py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 font-semibold rounded-xl"
+                      onClick={() => {
+                        setShowCreateFolderModal(false)
+                        setFolderName('')
+                      }}
+                      className="px-5 py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 font-semibold rounded-xl transition-colors"
                     >
                       Cancel
                     </button>
                   </div>
-                  {notificationMutation.isError && (
-                    <div className="rounded-xl bg-red-50 p-4">
-                      <p className="text-sm text-red-700">{(notificationMutation.error as Error).message}</p>
+
+                  {createFolderMutation.isError && (
+                    <div className="rounded-xl bg-red-50 border border-red-200 p-4">
+                      <p className="text-sm text-red-700">{(createFolderMutation.error as Error).message}</p>
                     </div>
                   )}
                 </form>

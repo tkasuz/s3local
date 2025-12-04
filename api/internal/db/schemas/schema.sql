@@ -34,7 +34,7 @@ CREATE TABLE IF NOT EXISTS objects (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     bucket_name TEXT NOT NULL,
     key TEXT NOT NULL,
-    data BLOB NOT NULL,
+    data BLOB,
     size INTEGER NOT NULL,
     etag TEXT NOT NULL,
     content_type TEXT NOT NULL DEFAULT 'application/octet-stream',

@@ -23,10 +23,11 @@ func TestPutObject(t *testing.T) {
 
 	r := chi.NewRouter()
 	r.Use(ctx.WithStore(store))
-	r.Route("/{bucket}/{key}", func(r chi.Router) {
+	r.Route("/{bucket}", func(r chi.Router) {
 		r.Use(ctx.WithBucketName())
-		r.Use(ctx.WithObjectKey())
-		r.Put("/", func(w http.ResponseWriter, r *http.Request) {
+
+		// Use wildcard to match any object key path including nested paths
+		r.With(ctx.WithObjectKey()).Put("/*", func(w http.ResponseWriter, r *http.Request) {
 			PutObject(w, r)
 		})
 	})
@@ -100,5 +101,60 @@ func TestPutObject(t *testing.T) {
 		})
 		assert.NoError(t, err)
 		assert.Equal(t, updatedData, obj.Data)
+	})
+
+	t.Run("Successfully upload object with trailing slash (folder marker)", func(t *testing.T) {
+		bucketName := "test-bucket-trailing-slash"
+		// Create a bucket first
+		err := store.Queries.CreateBucket(context.Background(), db.CreateBucketParams{
+			Name:   bucketName,
+			Region: "us-east-1",
+		})
+		assert.NoError(t, err)
+
+		// Upload object with trailing slash (folder marker)
+		testData := []byte("")
+		_, err = s3Client.PutObject(context.Background(), &s3.PutObjectInput{
+			Bucket: aws.String(bucketName),
+			Key:    aws.String("folder1/"),
+			Body:   bytes.NewReader(testData),
+		})
+		assert.NoError(t, err)
+
+		// Verify object was created with the trailing slash
+		obj, err := store.Queries.GetObject(context.Background(), db.GetObjectParams{
+			BucketName: bucketName,
+			Key:        "folder1/",
+		})
+		assert.NoError(t, err)
+		assert.Equal(t, "folder1/", obj.Key, "Key should include the trailing slash")
+		assert.Equal(t, int64(0), obj.Size)
+	})
+
+	t.Run("Successfully upload object with nested path and trailing slash", func(t *testing.T) {
+		bucketName := "test-bucket-nested-trailing-slash"
+		// Create a bucket first
+		err := store.Queries.CreateBucket(context.Background(), db.CreateBucketParams{
+			Name:   bucketName,
+			Region: "us-east-1",
+		})
+		assert.NoError(t, err)
+
+		// Upload object with nested path and trailing slash
+		testData := []byte("")
+		_, err = s3Client.PutObject(context.Background(), &s3.PutObjectInput{
+			Bucket: aws.String(bucketName),
+			Key:    aws.String("parent/child/subfolder/"),
+			Body:   bytes.NewReader(testData),
+		})
+		assert.NoError(t, err)
+
+		// Verify object was created with the full key including trailing slash
+		obj, err := store.Queries.GetObject(context.Background(), db.GetObjectParams{
+			BucketName: bucketName,
+			Key:        "parent/child/subfolder/",
+		})
+		assert.NoError(t, err)
+		assert.Equal(t, "parent/child/subfolder/", obj.Key, "Key should include the full path with trailing slash")
 	})
 }

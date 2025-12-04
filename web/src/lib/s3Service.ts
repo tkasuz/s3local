@@ -65,18 +65,28 @@ export const getBucketTags = async (bucketName: string): Promise<Tag[]> => {
   }
 }
 
-// List objects in a bucket
+export interface ListObjectsResult {
+  objects: S3Object[]
+  commonPrefixes: string[]
+}
+
+// List objects in a bucket with delimiter support
 export const listObjects = async (
   bucketName: string,
-  prefix?: string
-): Promise<S3Object[]> => {
+  prefix?: string,
+  delimiter?: string
+): Promise<ListObjectsResult> => {
   const client = getS3Client()
   const command = new ListObjectsV2Command({
     Bucket: bucketName,
     Prefix: prefix,
+    Delimiter: delimiter,
   })
   const response = await client.send(command)
-  return response.Contents || []
+  return {
+    objects: response.Contents || [],
+    commonPrefixes: response.CommonPrefixes?.map(cp => cp.Prefix || '') || [],
+  }
 }
 
 // Upload object with optional tags

@@ -18,7 +18,7 @@ export const Route = createRootRoute({
               <div>
                 <Link to="/" className="group">
                   <h1 className="text-xl font-bold bg-gradient-to-r from-gray-900 to-gray-600 bg-clip-text text-transparent group-hover:from-blue-600 group-hover:to-blue-400 transition-all duration-200">
-                    S3 Console
+                    Local S3 Console
                   </h1>
                   <p className="text-xs text-gray-500 font-medium">Object Storage Management</p>
                 </Link>
